@@ -94,9 +94,10 @@ Para ejecutar el proyecto **con Docker** (recomendado, no necesitas Python):
 
 Para ejecutarlo **sin Docker**:
 
-- Python 3.9 o superior (la imagen de producción usa 3.12)
+- **Python 3.9 – 3.12** (Django 4.2 no soporta 3.13 todavía; la imagen de
+  producción usa 3.12). Comprueba tu versión con `python3 --version`.
 - `pip` y `venv`
-- Opcional: PostgreSQL 14+. Si no defines `DATABASE_URL` el proyecto usa SQLite
+- No hace falta base de datos: sin `DATABASE_URL` el proyecto usa SQLite
   automáticamente, lo que basta para desarrollo y para correr los tests.
 
 ---
@@ -113,17 +114,22 @@ python3 -m venv .venv
 source .venv/bin/activate           # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# 3. (Opcional) Configurar variables de entorno
-cp .env.example .env
-
-# 4. Aplicar migraciones
+# 3. Aplicar migraciones (crea el SQLite local)
 python manage.py migrate
 
-# 5. (Opcional) Cargar libros de ejemplo
+# 4. Cargar 6 libros de ejemplo
 python manage.py seed_books
 
-# 6. Arrancar el servidor
+# 5. Arrancar el servidor
 python manage.py runserver
+```
+
+Eso es todo: **no hay que configurar ninguna variable de entorno**. Si quieres
+cambiar algo (moneda local, margen, proveedor de tasas…), copia la plantilla y
+edítala — cada variable está explicada ahí mismo:
+
+```bash
+cp .env.example .env
 ```
 
 La API queda disponible en **http://localhost:8000**:
@@ -131,6 +137,12 @@ La API queda disponible en **http://localhost:8000**:
 - `http://localhost:8000/` → índice de endpoints
 - `http://localhost:8000/api/docs` → Swagger UI
 - `http://localhost:8000/health` → health check
+
+```bash
+curl http://localhost:8000/books
+curl -X POST http://localhost:8000/books/1/calculate-price \
+  -H "Content-Type: application/json" -d '{}'
+```
 
 Para usar PostgreSQL en local en lugar de SQLite basta con exportar la variable:
 

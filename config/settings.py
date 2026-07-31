@@ -240,7 +240,10 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", True)
     CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", True)
-    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    # Opt-in, not automatic: a plain `manage.py runserver` also has DEBUG off,
+    # and redirecting it to https://localhost would leave the project unusable
+    # out of the box. The deployment turns it on explicitly (see render.yaml).
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
     # Container/platform probes reach /health over plain HTTP, so they must not
     # be bounced to HTTPS.
     SECURE_REDIRECT_EXEMPT = [r"^health/?$"]

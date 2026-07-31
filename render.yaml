@@ -29,6 +29,9 @@ services:
         value: "true"
       - key: DB_USE_PGBOUNCER
         value: "true"
+      # Only meaningful behind a TLS-terminating proxy such as Render's.
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
       # Supabase connection string (Connection Pooling / Transaction mode).
       - key: DATABASE_URL
         sync: false

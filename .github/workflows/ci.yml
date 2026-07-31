@@ -46,6 +46,27 @@ jobs:
 
       - name: Django system checks
         run: python manage.py check --deploy --fail-level ERROR
+        env:
+          # The deployment turns these on; the check must see them.
+          SECURE_SSL_REDIRECT: "true"
+
+      # Guards the promise made in section 2 of the README: a fresh clone with
+      # no configuration at all must serve requests over plain HTTP.
+      - name: The README's local quickstart works with zero configuration
+        env:
+          DATABASE_URL: ""
+        run: |
+          python manage.py migrate --noinput
+          python manage.py seed_books
+          python manage.py runserver 8000 --noreload &
+          for attempt in $(seq 1 20); do
+            sleep 1
+            curl -fsS http://127.0.0.1:8000/health > /dev/null 2>&1 && break
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/books)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/docs)" = "200"
+          curl -fsS http://127.0.0.1:8000/books | grep -q '"count"'
+          rm -f db.sqlite3
 
       - name: Verify there are no missing migrations
         run: python manage.py makemigrations --check --dry-run
