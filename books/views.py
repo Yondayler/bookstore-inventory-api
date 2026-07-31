@@ -27,6 +27,20 @@ ORDERING_FIELDS = {
 }
 
 
+def _clean_text(value, field_name):
+    """Sanitise a free-text query parameter.
+
+    Unlike request bodies —which DRF's ``CharField`` already guards— query
+    parameters reach the ORM untouched, and PostgreSQL refuses NUL bytes: what
+    should be a bad request would surface as a 500.
+    """
+    if value is None:
+        return None
+    if "\x00" in value:
+        raise ValidationError({field_name: ["Null characters are not allowed."]})
+    return value.strip()
+
+
 def _positive_int(value, field_name):
     try:
         parsed = int(value)
@@ -85,21 +99,20 @@ class BookViewSet(viewsets.ModelViewSet):
         queryset = Book.objects.all()
         params = self.request.query_params
 
-        category = params.get("category")
+        category = _clean_text(params.get("category"), "category")
         if category:
-            queryset = queryset.filter(category__icontains=category.strip())
+            queryset = queryset.filter(category__icontains=category)
 
-        author = params.get("author")
+        author = _clean_text(params.get("author"), "author")
         if author:
-            queryset = queryset.filter(author__icontains=author.strip())
+            queryset = queryset.filter(author__icontains=author)
 
-        supplier_country = params.get("supplier_country")
+        supplier_country = _clean_text(params.get("supplier_country"), "supplier_country")
         if supplier_country:
-            queryset = queryset.filter(supplier_country__iexact=supplier_country.strip())
+            queryset = queryset.filter(supplier_country__iexact=supplier_country)
 
-        search = params.get("q") or params.get("search")
+        search = _clean_text(params.get("q") or params.get("search"), "q")
         if search:
-            search = search.strip()
             queryset = queryset.filter(
                 Q(title__icontains=search)
                 | Q(author__icontains=search)
@@ -146,12 +159,12 @@ class BookViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
-        category = request.query_params.get("category")
-        if not category or not category.strip():
+        category = _clean_text(request.query_params.get("category"), "category")
+        if not category:
             raise ValidationError(
                 {"category": ["The 'category' query parameter is required."]}
             )
-        queryset = Book.objects.filter(category__icontains=category.strip())
+        queryset = Book.objects.filter(category__icontains=category)
         return self._paginated(queryset)
 
     @extend_schema(

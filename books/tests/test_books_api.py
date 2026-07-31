@@ -245,6 +245,24 @@ def test_list_filters_and_ordering(api_client, catalogue):
     assert invalid.status_code == 400
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/books?q=%00nulo",
+        "/books?category=%00",
+        "/books?author=%00",
+        "/books?supplier_country=%00",
+        "/books/search?category=%00nulo",
+    ],
+)
+def test_null_bytes_in_query_params_return_400(api_client, catalogue, path):
+    """PostgreSQL rejects NUL bytes, so they must be caught before the ORM."""
+    response = api_client.get(path)
+
+    assert response.status_code == 400
+    assert response.data["error"]["code"] == "validation_error"
+
+
 def test_health_endpoint(api_client):
     response = api_client.get("/health")
 
