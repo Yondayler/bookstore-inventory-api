@@ -1,9 +1,10 @@
 from django.db.models import Q
+from django.http import Http404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from books.models import Book
@@ -70,6 +71,15 @@ class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
     lookup_value_regex = r"[0-9]+"
+
+    def get_object(self):
+        """Same as DRF's, but with a 404 message that names the book."""
+        try:
+            return super().get_object()
+        except (Http404, NotFound):
+            raise NotFound(
+                f"Book with id {self.kwargs.get(self.lookup_field)} was not found."
+            )
 
     def get_queryset(self):
         queryset = Book.objects.all()

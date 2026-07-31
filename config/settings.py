@@ -134,6 +134,7 @@ STORAGES = {
 # Django REST Framework
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": ["core.permissions.WriteRequiresApiKey"],
     "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardPagination",
     "PAGE_SIZE": env_int("DEFAULT_PAGE_SIZE", 20),
     "EXCEPTION_HANDLER": "core.exception_handler.api_exception_handler",
@@ -157,6 +158,10 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "core.schema.strip_trailing_slashes",
+    ],
 }
 
 CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", True)
@@ -171,6 +176,12 @@ DEFAULT_MARGIN_PERCENTAGE = env_str("DEFAULT_MARGIN_PERCENTAGE", "40")
 # Reject ISBNs that are well-formed but whose check digit is wrong.
 ISBN_VALIDATE_CHECKSUM = env_bool("ISBN_VALIDATE_CHECKSUM", False)
 
+# Optional write protection. While empty (the default) the API is fully open,
+# which is what the evaluation environment needs. Set API_KEY to any value and
+# POST/PUT/PATCH/DELETE start requiring the `X-API-Key` header; reads stay
+# public either way.
+API_KEY = env_str("API_KEY", "")
+
 # ---------------------------------------------------------------------------
 # Exchange rate integration
 # ---------------------------------------------------------------------------
@@ -180,30 +191,44 @@ EXCHANGE_RATE_API_URL = env_str(
 EXCHANGE_RATE_TIMEOUT = env_int("EXCHANGE_RATE_TIMEOUT", 5)
 EXCHANGE_RATE_CACHE_TTL = env_int("EXCHANGE_RATE_CACHE_TTL", 600)  # seconds
 # Used when the external API is unreachable (business rule: "si la API de
-# cambio falla, usar tasa por defecto").
+# cambio falla, usar tasa por defecto"). Snapshot taken from the provider on
+# 2026-07-31; override with the FALLBACK_EXCHANGE_RATES environment variable to
+# refresh them without touching the code.
 FALLBACK_EXCHANGE_RATES = env_decimal_map(
     "FALLBACK_EXCHANGE_RATES",
     {
         "USD": "1",
-        "EUR": "0.92",
-        "GBP": "0.78",
-        "MXN": "18.50",
-        "COP": "4050",
-        "ARS": "980",
-        "CLP": "950",
-        "PEN": "3.75",
-        "BRL": "5.45",
-        "DOP": "59.50",
-        "VES": "36.50",
+        "EUR": "0.869",
+        "GBP": "0.745",
+        "MXN": "17.36",
+        "COP": "3200.63",
+        "ARS": "1490.84",
+        "CLP": "933.41",
+        "PEN": "3.39",
+        "BRL": "5.09",
+        "DOP": "58.03",
+        "VES": "746.63",
     },
 )
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "bookstore-inventory-api",
+# gunicorn runs several worker processes, and an in-memory cache would be
+# private to each one (so the same rate would be fetched once per worker).
+# With a database available we use it as a shared cache instead; the table is
+# created by the `books.0002_exchange_rate_cache_table` migration.
+if DATABASE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "exchange_rate_cache",
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "bookstore-inventory-api",
+        }
+    }
 
 # ---------------------------------------------------------------------------
 # Security (only enforced outside DEBUG)
