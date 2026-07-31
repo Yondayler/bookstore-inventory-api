@@ -1,0 +1,485 @@
+{
+  "info": {
+    "_postman_id": "8f2c1b90-6f4a-4d61-9d8a-6a1a2f7c1d01",
+    "name": "Bookstore Inventory API",
+    "description": "Colección de la prueba técnica de Nextep Innovation.\n\nSelecciona el environment **Bookstore API - Production** para probar contra la API desplegada, o **Bookstore API - Local** para el entorno local (http://localhost:8000).\n\nLa petición `Create book` guarda automáticamente el `id` devuelto en la variable de colección `book_id`, que usan el resto de peticiones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://bookstore-inventory-api.onrender.com",
+      "type": "string"
+    },
+    { "key": "book_id", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health & docs",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] },
+            "description": "Comprueba que la API y la base de datos responden."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('database ok', () => pm.expect(pm.response.json().database).to.eql('ok'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "API root (índice de endpoints)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+          },
+          "response": []
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/docs", "host": ["{{base_url}}"], "path": ["api", "docs"] },
+            "description": "Documentación interactiva OpenAPI 3."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "CRUD",
+      "item": [
+        {
+          "name": "Create book",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"El Quijote\",\n  \"author\": \"Miguel de Cervantes\",\n  \"isbn\": \"978-84-376-0494-7\",\n  \"cost_usd\": 15.99,\n  \"stock_quantity\": 25,\n  \"category\": \"Literatura Clásica\",\n  \"supplier_country\": \"ES\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/books", "host": ["{{base_url}}"], "path": ["books"] },
+            "description": "Crea un libro. Si el ISBN ya existe la API responde 400 con un mensaje explicativo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('book_id', body.id);",
+                  "  pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "  pm.test('selling_price_local empieza en null', () => pm.expect(body.selling_price_local).to.eql(null));",
+                  "} else {",
+                  "  pm.test('400 por ISBN duplicado (el libro ya existía)', () => pm.response.to.have.status(400));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List books (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books?page=1&page_size=10",
+              "host": ["{{base_url}}"],
+              "path": ["books"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "10" },
+                { "key": "q", "value": "quijote", "disabled": true },
+                { "key": "category", "value": "Literatura", "disabled": true },
+                { "key": "ordering", "value": "-cost_usd", "disabled": true }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('respuesta paginada', () => pm.expect(pm.response.json()).to.have.property('results'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get book by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update book (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Don Quijote de la Mancha\",\n  \"author\": \"Miguel de Cervantes\",\n  \"isbn\": \"978-84-376-0494-7\",\n  \"cost_usd\": 17.50,\n  \"stock_quantity\": 12,\n  \"category\": \"Literatura Clásica\",\n  \"supplier_country\": \"ES\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Partial update (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"stock_quantity\": 4\n}" },
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete book",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}"]
+            },
+            "description": "⚠️ Ejecuta esta petición al final: borra el libro creado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Endpoints opcionales",
+      "item": [
+        {
+          "name": "Search by category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/search?category=Literatura Clásica",
+              "host": ["{{base_url}}"],
+              "path": ["books", "search"],
+              "query": [{ "key": "category", "value": "Literatura Clásica" }]
+            },
+            "description": "Búsqueda por categoría (coincidencia parcial, sin distinguir mayúsculas)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Low stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/low-stock?threshold=10",
+              "host": ["{{base_url}}"],
+              "path": ["books", "low-stock"],
+              "query": [{ "key": "threshold", "value": "10" }]
+            },
+            "description": "Libros cuyo stock es menor o igual al umbral (10 por defecto)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('devuelve el threshold aplicado', () => pm.expect(pm.response.json()).to.have.property('threshold'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cálculo de precio",
+      "item": [
+        {
+          "name": "Calculate price (defaults: EUR, 40%)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}/calculate-price",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}", "calculate-price"]
+            },
+            "description": "Obtiene la tasa USD→moneda local en tiempo real, aplica el margen del 40%, guarda `selling_price_local` y devuelve el detalle del cálculo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('incluye el detalle del cálculo', () => {",
+                  "  pm.expect(b).to.have.all.keys('book_id','cost_usd','exchange_rate','cost_local','margin_percentage','selling_price_local','currency','calculation_timestamp','rate_source','rate_provider','fallback_used');",
+                  "});",
+                  "pm.test('precio = coste local + margen', () => {",
+                  "  const esperado = Math.round(b.cost_usd * b.exchange_rate * (1 + b.margin_percentage / 100) * 100) / 100;",
+                  "  pm.expect(Math.abs(b.selling_price_local - esperado)).to.be.below(0.02);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Calculate price (moneda y margen personalizados)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency\": \"MXN\",\n  \"margin_percentage\": 25\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}/calculate-price",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}", "calculate-price"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('usa la moneda solicitada', () => pm.expect(pm.response.json().currency).to.eql('MXN'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Manejo de errores",
+      "item": [
+        {
+          "name": "400 - cost_usd inválido",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Libro inválido\",\n  \"author\": \"Autor\",\n  \"isbn\": \"9780306406157\",\n  \"cost_usd\": -1,\n  \"stock_quantity\": 5\n}"
+            },
+            "url": { "raw": "{{base_url}}/books", "host": ["{{base_url}}"], "path": ["books"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('detalla el campo cost_usd', () => pm.expect(pm.response.json().error.details).to.have.property('cost_usd'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "400 - ISBN con formato inválido",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"ISBN inválido\",\n  \"author\": \"Autor\",\n  \"isbn\": \"123\",\n  \"cost_usd\": 10.00,\n  \"stock_quantity\": 5\n}"
+            },
+            "url": { "raw": "{{base_url}}/books", "host": ["{{base_url}}"], "path": ["books"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('detalla el campo isbn', () => pm.expect(pm.response.json().error.details).to.have.property('isbn'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "400 - stock negativo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Stock negativo\",\n  \"author\": \"Autor\",\n  \"isbn\": \"9780306406157\",\n  \"cost_usd\": 10.00,\n  \"stock_quantity\": -3\n}"
+            },
+            "url": { "raw": "{{base_url}}/books", "host": ["{{base_url}}"], "path": ["books"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "404 - libro inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/999999",
+              "host": ["{{base_url}}"],
+              "path": ["books", "999999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test(\"code = 'not_found'\", () => pm.expect(pm.response.json().error.code).to.eql('not_found'));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "400 - moneda no soportada",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currency\": \"XYZ\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}/calculate-price",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}", "calculate-price"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "405 - método no permitido",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": { "raw": "{{base_url}}/books", "host": ["{{base_url}}"], "path": ["books"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('405 Method Not Allowed', () => pm.response.to.have.status(405));"]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
