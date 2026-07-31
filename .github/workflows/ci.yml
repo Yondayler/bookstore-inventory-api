@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bookstore
+          POSTGRES_USER: bookstore
+          POSTGRES_PASSWORD: bookstore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bookstore -d bookstore"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The suite runs against the same engine as production, not SQLite.
+      DATABASE_URL: postgres://bookstore:bookstore@localhost:5432/bookstore
+      DB_SSL_REQUIRE: "false"
+      DB_USE_PGBOUNCER: "false"
+      SECRET_KEY: ci-secret-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Django system checks
+        run: python manage.py check --deploy --fail-level ERROR
+
+      - name: Verify there are no missing migrations
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run the test suite
+        run: pytest --cov=books --cov=core --cov-report=term-missing
+
+  docker:
+    name: Docker image builds and serves
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t bookstore-inventory-api:ci .
+
+      - name: Boot the stack defined in docker-compose.yml
+        run: docker compose up -d --build
+
+      - name: Wait for the health check to pass
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health | grep -q '"database": *"ok"'; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "The API never became healthy"
+          docker compose logs
+          exit 1
+
+      - name: Smoke-test the endpoints
+        run: |
+          set -e
+          curl -fsS http://localhost:8000/books | head -c 200
+          curl -fsS -X POST http://localhost:8000/books \
+            -H 'Content-Type: application/json' \
+            -d '{"title":"CI","author":"CI","isbn":"9780306406157","cost_usd":10.00,"stock_quantity":1,"category":"CI"}' \
+            | grep -q '"id"'
+          curl -fsS -X POST http://localhost:8000/books/1/calculate-price \
+            -H 'Content-Type: application/json' -d '{}' | grep -q 'selling_price_local'
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
