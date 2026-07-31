@@ -245,6 +245,29 @@ def test_list_filters_and_ordering(api_client, catalogue):
     assert invalid.status_code == 400
 
 
+def test_concurrent_duplicate_isbn_reports_400_not_500(
+    api_client, book_payload, monkeypatch
+):
+    """Two simultaneous creates can only collide at the database constraint.
+
+    Simulated here by making the save raise what PostgreSQL would raise.
+    """
+    from django.db import IntegrityError
+
+    from books.serializers import BookSerializer
+
+    def explode(self, **kwargs):
+        raise IntegrityError('duplicate key value violates unique constraint')
+
+    monkeypatch.setattr(BookSerializer, "save", explode)
+
+    response = api_client.post("/books", book_payload, format="json")
+
+    assert response.status_code == 400
+    assert response.data["error"]["code"] == "validation_error"
+    assert "already exists" in response.data["error"]["details"]["isbn"][0]
+
+
 @pytest.mark.parametrize(
     "path",
     [

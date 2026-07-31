@@ -1,3 +1,4 @@
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import Http404
 from drf_spectacular.types import OpenApiTypes
@@ -93,6 +94,29 @@ class BookViewSet(viewsets.ModelViewSet):
         except (Http404, NotFound):
             raise NotFound(
                 f"Book with id {self.kwargs.get(self.lookup_field)} was not found."
+            )
+
+    def perform_create(self, serializer):
+        self._save_reporting_duplicates(serializer)
+
+    def perform_update(self, serializer):
+        self._save_reporting_duplicates(serializer)
+
+    def _save_reporting_duplicates(self, serializer):
+        """Save, turning a unique-constraint collision into a 400.
+
+        The serializer already rejects duplicate ISBNs, but two concurrent
+        requests can both pass that check and only collide at the database
+        constraint. Without this, the loser of the race gets a 500 for what is
+        really a bad request. ``atomic`` keeps the transaction usable
+        afterwards, which PostgreSQL requires.
+        """
+        try:
+            with transaction.atomic():
+                serializer.save()
+        except IntegrityError:
+            raise ValidationError(
+                {"isbn": ["A book with this ISBN already exists."]}
             )
 
     def get_queryset(self):
