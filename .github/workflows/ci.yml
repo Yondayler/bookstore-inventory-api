@@ -90,6 +90,18 @@ jobs:
           curl -fsS -X POST http://localhost:8000/books/1/calculate-price \
             -H 'Content-Type: application/json' -d '{}' | grep -q 'selling_price_local'
 
+      # The Postman collection is a deliverable, so it is executed like any
+      # other test — against the local stack, never against production.
+      - name: Run the Postman collection with newman
+        run: |
+          npx --yes newman@6 run postman/Bookstore-Inventory-API.postman_collection.json \
+            -e postman/Bookstore-API-Local.postman_environment.json \
+            --color off
+
+      - name: Check the collection left the catalogue untouched
+        run: |
+          test "$(curl -fsS 'http://localhost:8000/books/search?category=Literatura' | python3 -c 'import sys,json;print(json.load(sys.stdin)["count"])')" -eq 3
+
       - name: Tear down
         if: always()
         run: docker compose down -v

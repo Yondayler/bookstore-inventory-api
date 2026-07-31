@@ -363,6 +363,14 @@ En la carpeta [`postman/`](postman/) hay tres archivos para importar en Postman
 | `Bookstore-API-Production.postman_environment.json` | `base_url` apuntando a la API desplegada |
 | `Bookstore-API-Local.postman_environment.json` | `base_url` apuntando a `http://localhost:8000` |
 
+También se puede ejecutar sin abrir Postman:
+
+```bash
+npx newman run postman/Bookstore-Inventory-API.postman_collection.json \
+  -e postman/Bookstore-API-Production.postman_environment.json
+# 20 peticiones · 33 assertions · 0 fallos
+```
+
 Selecciona el environment **Bookstore API - Production** en la esquina superior
 derecha y ya puedes ejecutar todo contra la API pública, sin levantar nada en
 local. Cada petición incluye tests que verifican el código de estado y la forma
@@ -406,9 +414,12 @@ ejecuta dos trabajos:
 1. **Tests sobre PostgreSQL** — la misma suite corriendo contra un Postgres 16
    real (no SQLite), más `manage.py check --deploy` y la comprobación de que no
    quedan migraciones sin generar.
-2. **Docker** — construye la imagen, levanta `docker-compose.yml` completo,
-   espera al health check y hace un smoke test de los endpoints. Así el
-   `docker compose up` del README está verificado, no solo escrito.
+2. **Docker + Postman** — construye la imagen, levanta `docker-compose.yml`
+   completo, espera al health check, hace un smoke test de los endpoints y
+   **ejecuta la colección de Postman con newman** contra esa instancia,
+   comprobando después que el catálogo de ejemplo sigue intacto. Así el
+   `docker compose up` del README y la colección entregada están verificados,
+   no solo escritos.
 
 Un tercer workflow, [`keep-alive.yml`](.github/workflows/keep-alive.yml), hace
 ping a `/health` cada 10 minutos entre las 12:00 y las 23:59 UTC para que el
