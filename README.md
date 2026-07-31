@@ -23,6 +23,52 @@ Prueba técnica — **Nextep Innovation** · FullStack Developer (Backend Focus)
 
 ---
 
+## Pruébala ahora mismo
+
+Sin instalar nada. Copia y pega:
+
+```bash
+API=https://bookstore-inventory-api-qtgy.onrender.com
+
+# 1. El servicio y su base de datos responden
+curl $API/health
+
+# 2. Inventario actual
+curl "$API/books?page_size=3"
+
+# 3. Crear un libro y quedarnos con su id
+ID=$(curl -s -X POST $API/books -H "Content-Type: application/json" -d '{
+  "title": "El Quijote",
+  "author": "Miguel de Cervantes",
+  "isbn": "9788420412146",
+  "cost_usd": 15.99,
+  "stock_quantity": 25,
+  "category": "Literatura Clásica",
+  "supplier_country": "ES"
+}' | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+
+# 4. Precio de venta sugerido con la tasa USD→EUR de este momento
+curl -X POST $API/books/$ID/calculate-price -H "Content-Type: application/json" -d '{}'
+
+# 5. Reglas de negocio en acción: ISBN inválido → 400 con el detalle del campo
+curl -X POST $API/books -H "Content-Type: application/json" \
+  -d '{"title":"X","author":"Y","isbn":"123","cost_usd":10}'
+
+# 6. Dejarlo como estaba
+curl -X DELETE $API/books/$ID
+```
+
+Si repites el paso 3, la segunda vez responde `400`: ese ISBN ya existe y no se
+permiten libros duplicados.
+
+O importa la [colección de Postman](#7-colección-de-postman), que ya apunta a
+esta URL, y ejecútala entera con el *Collection Runner*.
+
+> La primera petición puede tardar ~50 s si el servicio estaba dormido: es el
+> plan gratuito de Render. Las siguientes responden en ~150 ms.
+
+---
+
 ## Índice
 
 1. [Requisitos previos](#1-requisitos-previos)
