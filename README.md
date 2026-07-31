@@ -15,7 +15,7 @@ Prueba técnica — **Nextep Innovation** · FullStack Developer (Backend Focus)
 | **Despliegue** | Render (contenedor Docker) |
 | **API pública** | https://bookstore-inventory-api-qtgy.onrender.com |
 | **Documentación interactiva** | https://bookstore-inventory-api-qtgy.onrender.com/api/docs (Swagger UI) |
-| **Tests** | 64 tests con pytest, ejecutados sobre PostgreSQL en CI |
+| **Tests** | 65 tests con pytest, ejecutados sobre PostgreSQL en CI |
 
 [![Swagger UI de la API desplegada](docs/swagger-ui.png)](https://bookstore-inventory-api-qtgy.onrender.com/api/docs)
 
@@ -387,7 +387,7 @@ haga falta sobre el entorno compartido:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                     # 64 tests
+pytest                     # 65 tests
 pytest --cov=books --cov=core --cov-report=term-missing
 ```
 
@@ -538,7 +538,7 @@ bookstore-inventory-api/
 │   ├── migrations/             # Esquema + tabla de caché compartida
 │   ├── management/commands/
 │   │   └── seed_books.py       # Datos de ejemplo
-│   └── tests/                  # 64 tests
+│   └── tests/                  # 65 tests
 ├── .github/workflows/          # CI (tests sobre Postgres + Docker) y keep-alive
 ├── postman/                    # Colección + environments (producción y local)
 ├── docs/                       # Capturas usadas en este README

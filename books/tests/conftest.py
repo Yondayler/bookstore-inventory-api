@@ -18,8 +18,20 @@ SAMPLE_RATES_PAYLOAD = {
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
-    """The exchange rate cache must not leak between tests."""
+def isolated_cache(settings):
+    """Give every test a private, in-memory cache.
+
+    Two reasons: rates must not leak between tests, and the production cache
+    backend is the database, which would force even the pure validator tests to
+    request database access. The database backend itself is covered by
+    ``test_pricing.test_database_cache_backend_round_trip``.
+    """
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "tests",
+        }
+    }
     cache.clear()
     yield
     cache.clear()

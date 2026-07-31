@@ -181,6 +181,26 @@ def test_get_exchange_rate_handles_a_malformed_payload(settings):
     assert quote.rate == Decimal("0.92")
 
 
+def test_database_cache_backend_round_trip(settings):
+    """The production cache lives in the database and is shared by all workers.
+
+    The table is created by `books.0002_exchange_rate_cache_table`, so this also
+    guards that migration.
+    """
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "exchange_rate_cache",
+        }
+    }
+    from django.core.cache import cache
+
+    cache.set("rates-probe", "shared", 30)
+    assert cache.get("rates-probe") == "shared"
+    cache.delete("rates-probe")
+    assert cache.get("rates-probe") is None
+
+
 @responses.activate
 def test_get_exchange_rate_raises_503_without_a_fallback(settings):
     settings.FALLBACK_EXCHANGE_RATES = {}
