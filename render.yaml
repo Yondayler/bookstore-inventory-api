@@ -1,0 +1,34 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+# The API runs from the Dockerfile; the database lives in Supabase, so
+# DATABASE_URL has to be filled in from the Render dashboard (sync: false).
+services:
+  - type: web
+    name: bookstore-inventory-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: DEFAULT_LOCAL_CURRENCY
+        value: EUR
+      - key: DEFAULT_MARGIN_PERCENTAGE
+        value: "40"
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: SEED_DATABASE
+        value: "true"
+      - key: DB_SSL_REQUIRE
+        value: "true"
+      - key: DB_USE_PGBOUNCER
+        value: "true"
+      # Supabase connection string (Connection Pooling / Transaction mode).
+      - key: DATABASE_URL
+        sync: false

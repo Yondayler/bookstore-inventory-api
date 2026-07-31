@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bookstore-db
+    environment:
+      POSTGRES_DB: bookstore
+      POSTGRES_USER: bookstore
+      POSTGRES_PASSWORD: bookstore
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bookstore -d bookstore"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: bookstore-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DEBUG: "true"
+      SECRET_KEY: "local-development-secret"
+      ALLOWED_HOSTS: "*"
+      DATABASE_URL: "postgres://bookstore:bookstore@db:5432/bookstore"
+      DB_SSL_REQUIRE: "false"
+      DB_USE_PGBOUNCER: "false"
+      SEED_DATABASE: "true"
+      DEFAULT_LOCAL_CURRENCY: "EUR"
+      DEFAULT_MARGIN_PERCENTAGE: "40"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
