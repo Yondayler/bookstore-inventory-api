@@ -413,31 +413,24 @@ En la carpeta [`postman/`](postman/) hay tres archivos para importar en Postman
 | `Bookstore-API-Production.postman_environment.json` | `base_url` apuntando a la API desplegada |
 | `Bookstore-API-Local.postman_environment.json` | `base_url` apuntando a `http://localhost:8000` |
 
-También se puede ejecutar sin abrir Postman:
+Selecciona el environment **Bookstore API - Production** y ya puedes ejecutar
+todo contra la API pública, sin levantar nada en local. Cada petición lleva sus
+propios tests, así que lo más cómodo es lanzar la colección entera con el
+*Collection Runner*.
+
+Está pensada para ejecutarse tantas veces como haga falta sobre un entorno
+compartido: *Create book* genera un ISBN aleatorio (nunca choca con un libro
+existente) y guarda su `id`; las peticiones que modifican o borran actúan solo
+sobre ese libro y se detienen si no existe, de modo que los libros de ejemplo
+quedan intactos.
+
+Sin abrir Postman:
 
 ```bash
 npx newman run postman/Bookstore-Inventory-API.postman_collection.json \
   -e postman/Bookstore-API-Production.postman_environment.json
 # 20 peticiones · 33 assertions · 0 fallos
 ```
-
-Selecciona el environment **Bookstore API - Production** en la esquina superior
-derecha y ya puedes ejecutar todo contra la API pública, sin levantar nada en
-local. Cada petición incluye tests que verifican el código de estado y la forma
-de la respuesta, así que lo más cómodo es lanzar la colección completa con el
-*Collection Runner*.
-
-Dos detalles pensados para que la colección se pueda ejecutar tantas veces como
-haga falta sobre el entorno compartido:
-
-- *Create book* **genera un ISBN-13 aleatorio** con dígito de control válido, así
-  que nunca choca con un libro ya existente, y guarda el `id` devuelto en la
-  variable `book_id`.
-- Las peticiones que **modifican o borran** datos (`PUT`, `PATCH`, `DELETE`,
-  `calculate-price`) solo actúan sobre ese libro: si `book_id` está vacío se
-  detienen con un mensaje pidiendo ejecutar antes *Create book*, de modo que
-  nunca tocan los libros de ejemplo. El borrado vive en la carpeta *Limpieza*,
-  al final, para que el runner lo ejecute cuando ya no hace falta.
 
 ---
 
@@ -458,121 +451,55 @@ forma del esquema OpenAPI. Las llamadas HTTP externas se simulan con
 
 ### Integración continua
 
-En cada `push` y cada pull request, [GitHub Actions](.github/workflows/ci.yml)
-ejecuta dos trabajos:
-
-1. **Tests sobre PostgreSQL** — la misma suite corriendo contra un Postgres 16
-   real (no SQLite), más `manage.py check --deploy` y la comprobación de que no
-   quedan migraciones sin generar.
-2. **Docker + Postman** — construye la imagen, levanta `docker-compose.yml`
-   completo, espera al health check, hace un smoke test de los endpoints y
-   **ejecuta la colección de Postman con newman** contra esa instancia,
-   comprobando después que el catálogo de ejemplo sigue intacto. Así el
-   `docker compose up` del README y la colección entregada están verificados,
-   no solo escritos.
-
-Un tercer workflow, [`keep-alive.yml`](.github/workflows/keep-alive.yml), hace
-ping a `/health` cada 10 minutos entre las 12:00 y las 23:59 UTC para que el
-plan gratuito de Render no duerma el servicio durante la evaluación.
+[GitHub Actions](.github/workflows/ci.yml) ejecuta en cada `push` la suite
+contra un PostgreSQL real, y además construye la imagen, levanta el
+`docker-compose.yml` entero y lanza la colección de Postman con newman contra
+él. Así el `docker compose up` de este README y la colección entregada están
+verificados, no solo escritos.
 
 ---
 
 ## 9. Despliegue en Render + Supabase
 
-La API está desplegada como contenedor Docker en **Render**, con la base de
-datos PostgreSQL gestionada en **Supabase** (el plan gratuito de Render suspende
-los servicios inactivos, así que mantener la base de datos fuera garantiza la
-persistencia de los datos).
+La API corre como **contenedor Docker en Render** y la base de datos es un
+**PostgreSQL gestionado en Supabase**. Están separados a propósito: el plan
+gratuito de Render suspende los servicios inactivos, y con la base de datos
+fuera los datos no dependen de eso.
 
-### 9.1 Base de datos (Supabase)
-
-1. Crear un proyecto en [supabase.com](https://supabase.com).
-2. *Project Settings → Database → Connection string → **Connection pooling*** y
-   copiar la URI en modo **Transaction** (puerto `6543`). Es la que hay que
-   usar: el host directo de Supabase solo resuelve por IPv6 y Render no lo
-   alcanza.
-3. Sustituir `[YOUR-PASSWORD]` por la contraseña del proyecto.
-
-```
-postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
-```
-
-### 9.2 API (Render)
-
-1. *New → Web Service* y conectar este repositorio de GitHub.
-2. Runtime **Docker** (Render detecta el `Dockerfile`; el `render.yaml` incluido
-   también sirve como *blueprint*).
-3. Health check path: `/health`.
-4. Variables de entorno:
-
-   | Variable | Valor |
-   |---|---|
-   | `DATABASE_URL` | la URI del pooler de Supabase |
-   | `SECRET_KEY` | una cadena aleatoria larga |
-   | `DEBUG` | `false` |
-   | `ALLOWED_HOSTS` | `*` |
-   | `SEED_DATABASE` | `true` (solo el primer despliegue, para cargar datos de ejemplo) |
-
-5. *Create Web Service*. En el arranque el contenedor aplica las migraciones
-   automáticamente (`RUN_MIGRATIONS=true` por defecto) y levanta gunicorn.
-
-Comprobación:
-
-```bash
-curl https://bookstore-inventory-api-qtgy.onrender.com/health
-```
+Al arrancar, el contenedor aplica las migraciones y levanta gunicorn; no hace
+falta ningún paso manual tras el despliegue. El [`render.yaml`](render.yaml)
+incluido reproduce el servicio completo como *blueprint*, y solo pide dos
+variables: `DATABASE_URL` (la cadena de conexión de Supabase) y `SECRET_KEY`.
 
 > El plan gratuito de Render duerme el servicio tras 15 minutos sin tráfico: la
-> primera petición después de ese tiempo puede tardar ~50 s en responder. Los
-> datos no se pierden porque viven en Supabase.
+> primera petición puede tardar ~50 s. Un workflow programado hace ping a
+> `/health` para mantenerlo despierto. Los datos nunca se pierden, viven en
+> Supabase.
 
 ---
 
 ## 10. Variables de entorno
 
-Todas son opcionales; los valores por defecto permiten ejecutar el proyecto sin
-configuración previa. Referencia completa en [`.env.example`](.env.example).
+**Ninguna es obligatoria**: sin configurar nada, el proyecto arranca con SQLite
+y valores por defecto sensatos. Estas son las que cambian el comportamiento:
 
-| Variable | Por defecto | Descripción |
+| Variable | Por defecto | Para qué sirve |
 |---|---|---|
-| `SECRET_KEY` | clave de desarrollo | Clave secreta de Django (obligatoria en producción) |
+| `DATABASE_URL` | vacío → SQLite | Conexión PostgreSQL; es lo único imprescindible en producción |
+| `SECRET_KEY` | clave de desarrollo | Clave de Django; obligatoria en producción |
 | `DEBUG` | `false` | Modo depuración |
-| `ALLOWED_HOSTS` | `*` | Hosts permitidos, separados por comas |
-| `DATABASE_URL` | vacío → SQLite | Cadena de conexión PostgreSQL |
-| `DB_SSL_REQUIRE` | `true` | Exigir SSL en la conexión a la base de datos |
-| `DB_USE_PGBOUNCER` | `true` | Ajustes necesarios al conectar por el pooler de Supabase |
-| `DEFAULT_PAGE_SIZE` | `20` | Tamaño de página por defecto |
-| `DEFAULT_LOCAL_CURRENCY` | `EUR` | Moneda local usada en el cálculo de precios |
-| `DEFAULT_MARGIN_PERCENTAGE` | `40` | Margen de ganancia por defecto |
-| `ISBN_VALIDATE_CHECKSUM` | `false` | Validar también el dígito de control del ISBN |
+| `DEFAULT_LOCAL_CURRENCY` | `EUR` | Moneda local del cálculo de precios |
+| `DEFAULT_MARGIN_PERCENTAGE` | `40` | Margen de ganancia |
+| `FALLBACK_EXCHANGE_RATES` | JSON con 11 monedas | Tasas a usar si el proveedor falla |
 | `API_KEY` | vacío → API abierta | Si se define, las escrituras exigen la cabecera `X-API-Key` |
-| `EXCHANGE_RATE_API_URL` | exchangerate-api.com | Proveedor de tasas de cambio |
-| `EXCHANGE_RATE_TIMEOUT` | `5` | Timeout de la llamada externa (segundos) |
-| `EXCHANGE_RATE_CACHE_TTL` | `600` | Segundos que se cachean las tasas |
-| `FALLBACK_EXCHANGE_RATES` | JSON con 11 monedas | Tasas por defecto si el proveedor falla |
-| `RUN_MIGRATIONS` | `true` | Aplicar migraciones al arrancar el contenedor |
-| `SEED_DATABASE` | `false` | Cargar libros de ejemplo al arrancar el contenedor |
-| `SECURE_SSL_REDIRECT` | `true` si `DEBUG=false` | Redirigir HTTP a HTTPS (`/health` queda exento para las sondas) |
-| `SECURE_HSTS_SECONDS` | `31536000` | Cabecera HSTS; solo se aplica fuera de `DEBUG` |
 
-Con `DEBUG=false`, `manage.py check --deploy` no reporta ninguna incidencia.
+El resto —ajustes de conexión, caché, seguridad HTTPS y arranque del
+contenedor— está documentado con comentarios en [`.env.example`](.env.example).
 
-### Protección opcional de las escrituras
-
-El entorno desplegado está **abierto a propósito**, para que el equipo evaluador
-pueda probar cualquier endpoint sin configurar nada. La API incluye igualmente
-un candado listo para usar: basta con definir `API_KEY` para que `POST`, `PUT`,
-`PATCH` y `DELETE` exijan la cabecera correspondiente, mientras las lecturas
-siguen siendo públicas.
-
-```bash
-# En Render: añadir la variable API_KEY y redesplegar.
-curl -X POST https://bookstore-inventory-api-qtgy.onrender.com/books \
-  -H "X-API-Key: <la clave>" -H "Content-Type: application/json" -d '{...}'
-```
-
-Sin la cabecera correcta la API responde `403` con
-`{"error": {"code": "permission_denied", ...}}`.
+Sobre `API_KEY`: el entorno desplegado está **abierto a propósito**, para que se
+pueda probar cualquier endpoint sin configurar nada. Definir esa variable
+convierte `POST`, `PUT`, `PATCH` y `DELETE` en operaciones con clave (`403` sin
+ella) dejando las lecturas públicas.
 
 ---
 
