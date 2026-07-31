@@ -233,11 +233,24 @@ else:
 # ---------------------------------------------------------------------------
 # Security (only enforced outside DEBUG)
 # ---------------------------------------------------------------------------
+# Render terminates TLS and forwards the original scheme in this header.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", True)
     CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", True)
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    # Container/platform probes reach /health over plain HTTP, so they must not
+    # be bounced to HTTPS.
+    SECURE_REDIRECT_EXEMPT = [r"^health/?$"]
+    SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 31536000)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
+
+# Deliberate: submitting a host to the browser preload list is a decision for
+# the domain owner, not something a technical exercise should ship enabled.
+SILENCED_SYSTEM_CHECKS = ["security.W021"]
 
 LOGGING = {
     "version": 1,

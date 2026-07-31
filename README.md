@@ -502,6 +502,10 @@ configuración previa. Referencia completa en [`.env.example`](.env.example).
 | `FALLBACK_EXCHANGE_RATES` | JSON con 11 monedas | Tasas por defecto si el proveedor falla |
 | `RUN_MIGRATIONS` | `true` | Aplicar migraciones al arrancar el contenedor |
 | `SEED_DATABASE` | `false` | Cargar libros de ejemplo al arrancar el contenedor |
+| `SECURE_SSL_REDIRECT` | `true` si `DEBUG=false` | Redirigir HTTP a HTTPS (`/health` queda exento para las sondas) |
+| `SECURE_HSTS_SECONDS` | `31536000` | Cabecera HSTS; solo se aplica fuera de `DEBUG` |
+
+Con `DEBUG=false`, `manage.py check --deploy` no reporta ninguna incidencia.
 
 ### Protección opcional de las escrituras
 

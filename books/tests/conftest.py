@@ -32,6 +32,9 @@ def isolated_cache(settings):
             "LOCATION": "tests",
         }
     }
+    # Production forces HTTPS; the test client speaks plain HTTP, so the
+    # redirect would turn every assertion into a 301.
+    settings.SECURE_SSL_REDIRECT = False
     cache.clear()
     yield
     cache.clear()
