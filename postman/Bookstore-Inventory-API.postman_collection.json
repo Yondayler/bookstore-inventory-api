@@ -8,7 +8,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "https://bookstore-inventory-api.onrender.com",
+      "value": "https://bookstore-inventory-api-qtgy.onrender.com",
       "type": "string"
     },
     { "key": "book_id", "value": "1", "type": "string" }

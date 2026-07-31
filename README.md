@@ -11,8 +11,8 @@ Prueba técnica — **Nextep Innovation** · FullStack Developer (Backend Focus)
 | **Stack** | Python 3.12 · Django 4.2 · Django REST Framework 3.15 |
 | **Base de datos** | PostgreSQL gestionado (Supabase) en producción · SQLite/Postgres en local |
 | **Despliegue** | Render (contenedor Docker) |
-| **API pública** | `https://TU-SERVICIO.onrender.com` |
-| **Documentación interactiva** | `https://TU-SERVICIO.onrender.com/api/docs` (Swagger UI) |
+| **API pública** | `https://bookstore-inventory-api-qtgy.onrender.com` |
+| **Documentación interactiva** | `https://bookstore-inventory-api-qtgy.onrender.com/api/docs` (Swagger UI) |
 | **Tests** | 56 tests con pytest |
 
 ---
@@ -126,7 +126,7 @@ variables de entorno (ver [sección 10](#10-variables-de-entorno)).
 
 ## 4. Endpoints y ejemplos de uso
 
-Base URL local: `http://localhost:8000` — producción: `https://TU-SERVICIO.onrender.com`.
+Base URL local: `http://localhost:8000` — producción: `https://bookstore-inventory-api-qtgy.onrender.com`.
 Todas las rutas aceptan la barra final de forma opcional (`/books` y `/books/`).
 
 | Método | Ruta | Descripción |
@@ -423,7 +423,7 @@ postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.co
 Comprobación:
 
 ```bash
-curl https://TU-SERVICIO.onrender.com/health
+curl https://bookstore-inventory-api-qtgy.onrender.com/health
 ```
 
 > El plan gratuito de Render duerme el servicio tras 15 minutos sin tráfico: la

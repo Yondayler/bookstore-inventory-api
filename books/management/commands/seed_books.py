@@ -31,7 +31,7 @@ SAMPLE_BOOKS = [
     {
         "title": "Rayuela",
         "author": "Julio Cortázar",
-        "isbn": "9788437604947",
+        "isbn": "978-84-376-0457-2",
         "cost_usd": Decimal("18.75"),
         "stock_quantity": 3,
         "category": "Literatura Clásica",
