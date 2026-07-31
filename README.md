@@ -1,5 +1,7 @@
 # Bookstore Inventory API
 
+[![CI](https://github.com/Yondayler/bookstore-inventory-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Yondayler/bookstore-inventory-api/actions/workflows/ci.yml)
+
 API REST para la gestión del inventario de una cadena de librerías, con cálculo
 del precio de venta sugerido a partir de tasas de cambio USD obtenidas en tiempo
 real.
@@ -11,9 +13,13 @@ Prueba técnica — **Nextep Innovation** · FullStack Developer (Backend Focus)
 | **Stack** | Python 3.12 · Django 4.2 · Django REST Framework 3.15 |
 | **Base de datos** | PostgreSQL gestionado (Supabase) en producción · SQLite/Postgres en local |
 | **Despliegue** | Render (contenedor Docker) |
-| **API pública** | `https://bookstore-inventory-api-qtgy.onrender.com` |
-| **Documentación interactiva** | `https://bookstore-inventory-api-qtgy.onrender.com/api/docs` (Swagger UI) |
-| **Tests** | 56 tests con pytest |
+| **API pública** | https://bookstore-inventory-api-qtgy.onrender.com |
+| **Documentación interactiva** | https://bookstore-inventory-api-qtgy.onrender.com/api/docs (Swagger UI) |
+| **Tests** | 64 tests con pytest, ejecutados sobre PostgreSQL en CI |
+
+[![Swagger UI de la API desplegada](docs/swagger-ui.png)](https://bookstore-inventory-api-qtgy.onrender.com/api/docs)
+
+<p align="center"><sub>Documentación OpenAPI 3 generada automáticamente y servida por la propia API</sub></p>
 
 ---
 
@@ -334,6 +340,7 @@ Todas las respuestas de error comparten el mismo formato:
 | Código | Cuándo se produce |
 |---|---|
 | `400` | Datos inválidos, ISBN duplicado o mal formado, `cost_usd` ≤ 0, stock negativo, moneda inexistente, parámetros de consulta inválidos |
+| `403` | Solo si `API_KEY` está configurada: escritura sin la cabecera `X-API-Key` correcta |
 | `404` | El libro solicitado no existe, o la ruta no corresponde a ningún endpoint |
 | `405` | Método HTTP no permitido en esa ruta |
 | `500` | Error inesperado (se registra en los logs y nunca devuelve HTML) |
@@ -358,10 +365,21 @@ En la carpeta [`postman/`](postman/) hay tres archivos para importar en Postman
 
 Selecciona el environment **Bookstore API - Production** en la esquina superior
 derecha y ya puedes ejecutar todo contra la API pública, sin levantar nada en
-local. La petición *Create book* guarda el `id` devuelto en la variable
-`book_id`, que reutilizan el resto de peticiones. Cada petición incluye tests
-que verifican el código de estado y la forma de la respuesta, así que puedes
-lanzar la colección completa con el *Collection Runner*.
+local. Cada petición incluye tests que verifican el código de estado y la forma
+de la respuesta, así que lo más cómodo es lanzar la colección completa con el
+*Collection Runner*.
+
+Dos detalles pensados para que la colección se pueda ejecutar tantas veces como
+haga falta sobre el entorno compartido:
+
+- *Create book* **genera un ISBN-13 aleatorio** con dígito de control válido, así
+  que nunca choca con un libro ya existente, y guarda el `id` devuelto en la
+  variable `book_id`.
+- Las peticiones que **modifican o borran** datos (`PUT`, `PATCH`, `DELETE`,
+  `calculate-price`) solo actúan sobre ese libro: si `book_id` está vacío se
+  detienen con un mensaje pidiendo ejecutar antes *Create book*, de modo que
+  nunca tocan los libros de ejemplo. El borrado vive en la carpeta *Limpieza*,
+  al final, para que el runner lo ejecute cuando ya no hace falta.
 
 ---
 
@@ -369,15 +387,32 @@ lanzar la colección completa con el *Collection Runner*.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                     # 56 tests
+pytest                     # 64 tests
 pytest --cov=books --cov=core --cov-report=term-missing
 ```
 
 La suite cubre el CRUD completo, la paginación y los filtros, cada regla de
 negocio, el endpoint de cálculo de precio (incluida la aritmética exacta del
-ejemplo de la prueba: 15.99 × 0.85 = 13.59 → +40 % = 19.03) y el comportamiento
-ante fallos del proveedor de tasas. Las llamadas HTTP externas se simulan con
+ejemplo de la prueba: 15.99 × 0.85 = 13.59 → +40 % = 19.03), el comportamiento
+ante fallos del proveedor de tasas, la protección opcional por API key y la
+forma del esquema OpenAPI. Las llamadas HTTP externas se simulan con
 `responses`, de modo que los tests no dependen de la red.
+
+### Integración continua
+
+En cada `push` y cada pull request, [GitHub Actions](.github/workflows/ci.yml)
+ejecuta dos trabajos:
+
+1. **Tests sobre PostgreSQL** — la misma suite corriendo contra un Postgres 16
+   real (no SQLite), más `manage.py check --deploy` y la comprobación de que no
+   quedan migraciones sin generar.
+2. **Docker** — construye la imagen, levanta `docker-compose.yml` completo,
+   espera al health check y hace un smoke test de los endpoints. Así el
+   `docker compose up` del README está verificado, no solo escrito.
+
+Un tercer workflow, [`keep-alive.yml`](.github/workflows/keep-alive.yml), hace
+ping a `/health` cada 10 minutos entre las 12:00 y las 23:59 UTC para que el
+plan gratuito de Render no duerma el servicio durante la evaluación.
 
 ---
 
@@ -449,12 +484,30 @@ configuración previa. Referencia completa en [`.env.example`](.env.example).
 | `DEFAULT_LOCAL_CURRENCY` | `EUR` | Moneda local usada en el cálculo de precios |
 | `DEFAULT_MARGIN_PERCENTAGE` | `40` | Margen de ganancia por defecto |
 | `ISBN_VALIDATE_CHECKSUM` | `false` | Validar también el dígito de control del ISBN |
+| `API_KEY` | vacío → API abierta | Si se define, las escrituras exigen la cabecera `X-API-Key` |
 | `EXCHANGE_RATE_API_URL` | exchangerate-api.com | Proveedor de tasas de cambio |
 | `EXCHANGE_RATE_TIMEOUT` | `5` | Timeout de la llamada externa (segundos) |
 | `EXCHANGE_RATE_CACHE_TTL` | `600` | Segundos que se cachean las tasas |
 | `FALLBACK_EXCHANGE_RATES` | JSON con 11 monedas | Tasas por defecto si el proveedor falla |
 | `RUN_MIGRATIONS` | `true` | Aplicar migraciones al arrancar el contenedor |
 | `SEED_DATABASE` | `false` | Cargar libros de ejemplo al arrancar el contenedor |
+
+### Protección opcional de las escrituras
+
+El entorno desplegado está **abierto a propósito**, para que el equipo evaluador
+pueda probar cualquier endpoint sin configurar nada. La API incluye igualmente
+un candado listo para usar: basta con definir `API_KEY` para que `POST`, `PUT`,
+`PATCH` y `DELETE` exijan la cabecera correspondiente, mientras las lecturas
+siguen siendo públicas.
+
+```bash
+# En Render: añadir la variable API_KEY y redesplegar.
+curl -X POST https://bookstore-inventory-api-qtgy.onrender.com/books \
+  -H "X-API-Key: <la clave>" -H "Content-Type: application/json" -d '{...}'
+```
+
+Sin la cabecera correcta la API responde `403` con
+`{"error": {"code": "permission_denied", ...}}`.
 
 ---
 
@@ -467,8 +520,10 @@ bookstore-inventory-api/
 │   ├── env.py                  # Lectura tipada de variables de entorno
 │   └── urls.py                 # Rutas raíz (/, /health, /books, /api/docs)
 ├── core/                       # Utilidades transversales
-│   ├── exception_handler.py    # Formato único de errores (400/404/500/503)
+│   ├── exception_handler.py    # Formato único de errores (400/403/404/500/503)
+│   ├── permissions.py          # Candado opcional por API key en las escrituras
 │   ├── pagination.py           # Paginación estándar
+│   ├── schema.py               # Ajustes del esquema OpenAPI
 │   └── views.py                # Índice de la API y health check
 ├── books/                      # Aplicación de dominio
 │   ├── models.py               # Modelo Book + constraints
@@ -480,10 +535,13 @@ bookstore-inventory-api/
 │   ├── services/
 │   │   ├── exchange_rate.py    # Cliente del proveedor de tasas + caché + fallback
 │   │   └── pricing.py          # Cálculo del precio sugerido (Decimal)
+│   ├── migrations/             # Esquema + tabla de caché compartida
 │   ├── management/commands/
 │   │   └── seed_books.py       # Datos de ejemplo
-│   └── tests/                  # 56 tests
+│   └── tests/                  # 64 tests
+├── .github/workflows/          # CI (tests sobre Postgres + Docker) y keep-alive
 ├── postman/                    # Colección + environments (producción y local)
+├── docs/                       # Capturas usadas en este README
 ├── scripts/entrypoint.sh       # Migraciones + gunicorn
 ├── Dockerfile
 ├── docker-compose.yml
@@ -505,7 +563,10 @@ bookstore-inventory-api/
   error de coma flotante.
 - **Caché de las tasas de cambio** (10 minutos). Un endpoint que llama a un
   tercero en cada petición es frágil y lento; además, el fallback configurable
-  evita que una caída del proveedor deje la operación bloqueada.
+  evita que una caída del proveedor deje la operación bloqueada. La caché vive
+  **en la base de datos**, no en memoria: gunicorn levanta varios procesos y una
+  caché en memoria sería privada de cada uno, así que la misma tasa se pediría
+  una vez por worker.
 - **ISBN normalizado en una columna aparte.** Permite guardar el ISBN tal y
   como lo escribe el usuario y, a la vez, garantizar la unicidad real
   independientemente de los guiones.
@@ -519,4 +580,13 @@ bookstore-inventory-api/
   con un 301 que puede perder el cuerpo de un POST; el router acepta ambas
   formas para evitarlo.
 - **Errores con un formato único** y sin HTML, para que cualquier cliente
-  (Postman, front-end, otro servicio) pueda tratarlos de forma programática.
+  (Postman, front-end, otro servicio) pueda tratarlos de forma programática, con
+  mensajes que nombran el recurso (`Book with id 4242 was not found.`) en lugar
+  del texto genérico del framework.
+- **Campos añadidos sobre el modelo del enunciado.** El libro incluye
+  `selling_price_currency` y `price_calculated_at`, y el cálculo devuelve
+  `rate_source`, `rate_provider` y `fallback_used`. Son aditivos —el JSON del
+  enunciado sigue estando completo— y responden a una pregunta que el
+  enunciado deja abierta: un precio guardado sin su moneda ni su fecha no es
+  auditable, y un cliente necesita saber si el precio se calculó con la tasa en
+  vivo o con la de respaldo.
