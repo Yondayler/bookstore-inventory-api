@@ -9,6 +9,9 @@ from books.validators import validate_isbn
 
 COUNTRY_CODE = re.compile(r"^[A-Za-z]{2}$")
 
+# Upper bound of PostgreSQL's `integer`, the column behind PositiveIntegerField.
+MAX_POSTGRES_INTEGER = 2147483647
+
 
 class BookSerializer(serializers.ModelSerializer):
     """Read/write representation of a book.
@@ -31,7 +34,13 @@ class BookSerializer(serializers.ModelSerializer):
         required=False,
         default=0,
         min_value=0,
-        error_messages={"min_value": "stock_quantity cannot be negative."},
+        # PostgreSQL's integer column tops out here; without the bound the
+        # database raises and a bad request turns into a 500.
+        max_value=MAX_POSTGRES_INTEGER,
+        error_messages={
+            "min_value": "stock_quantity cannot be negative.",
+            "max_value": f"stock_quantity cannot exceed {MAX_POSTGRES_INTEGER}.",
+        },
     )
 
     class Meta:

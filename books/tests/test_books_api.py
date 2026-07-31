@@ -38,6 +38,7 @@ def test_create_book_accepts_trailing_slash(api_client, book_payload):
         ("cost_usd", "0"),
         ("cost_usd", "-5.00"),
         ("stock_quantity", -1),
+        ("stock_quantity", 999999999999999999999),  # overflows PostgreSQL's integer
         ("isbn", "123"),
         ("isbn", "not-an-isbn"),
         ("title", ""),
