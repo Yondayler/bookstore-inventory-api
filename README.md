@@ -325,6 +325,10 @@ curl -X POST http://localhost:8000/books/1/calculate-price \
 }
 ```
 
+> Los valores del ejemplo son los del enunciado. Al ejecutarlo verás otros:
+> `exchange_rate` es la cotización real del momento, así que `cost_local` y
+> `selling_price_local` varían con ella. Lo que no varía es la fórmula.
+
 Lógica aplicada:
 
 1. Se toma el `cost_usd` del libro.
